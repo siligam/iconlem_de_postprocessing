@@ -360,7 +360,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
     if outfile is None:
         start_ts = dates_ds.index[0].strftime("%Y%m%dT%H%M%SZ")
         end_ts = dates_ds.index[-1].strftime("%Y%m%dT%H%M%SZ")
-        outfile = "1d_vars_{}_{}_{}.nc".format(domain, start_ts, end_ts)
+        outfile = "1d_vars_{}_{}-{}.nc".format(domain, start_ts, end_ts)
         print("outfile is set to: {}".format(outfile))
 
     outnc = netCDF4.Dataset(outfile, "w")
