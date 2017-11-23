@@ -569,7 +569,7 @@ if __name__ == '__main__':
     import click
 
     help_timesteps = """
-"fullday-timesteps" flag ensures that all timestamps exists for the complete
+"fullday-timesteps" flag ensures that all timestamps exist for the complete
 day by filling out any missing timesteps. The other flag restricts this
 extent to the ones found the files. In either of the cases, any missing
 timesteps in between the files are filled to have a continuous time series.
@@ -579,7 +579,7 @@ timesteps in between the files are filled to have a continuous time series.
     help_outfile = """The name of the output file. If not provided, it creates
 a name based on the time-steps in the files"""
 
-    help_domain = """if not provided, tries to infer domain name the files
+    help_domain = """if not provided, tries to infer domain name from the filenames
 """
 
     @click.command()
@@ -595,19 +595,19 @@ a name based on the time-steps in the files"""
         """
         Merge mutiple meteogram files into a single file.
 
-        The script is designed to handle missing data like stations, profile
+        The script is designed to handle missing data such as stations, profile
         variables (a.k.a volume variables), surface variables and time. It
         means, the files involved in the merge process may vary in the
         number of stations and/or variables.
 
         With respect to processing time dimension, any duplicated timesteps are
-        automatically droped and any missing timesteps are filled with a default
-        fill value. This is done to achive a continuous time series for the entire
+        automatically dropped and any missing timesteps are filled with a default
+        fill value. This is done to achieve a continuous time series for the entire
         dataset. Moreover, "fullday-timesteps" flag ensures that all timesteps
-        from begining of a day untill the end of the day exists in the outfile.
+        from beginning of a day until the end of the day exists in the outfile.
 
         In few meteogram files, a bug (typo) in the timestamp for the last
-        timestep was discovered. This scipt also accounts to fix that bug.
+        timestep was discovered. This script also accounts to fix that bug.
 
         To avoid inconsistencies in meteogram files (across simulations), provide
         a well known good meteogram which has complete set of station, variables
