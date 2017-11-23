@@ -352,6 +352,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
         refnc = netCDF4.Dataset(reference_file)
         allncids = [refnc] + ncids
 
+    print("reading dates from files...")
     dates_ds = merge_parse_date(ncids, fullday_timesteps=fullday_timesteps)
     time_step = create_time_step(len(dates_ds))
     time_data = create_time(dates_ds.index)
@@ -360,9 +361,11 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
         start_ts = dates_ds.index[0].strftime("%Y%m%dT%H%M%SZ")
         end_ts = dates_ds.index[-1].strftime("%Y%m%dT%H%M%SZ")
         outfile = "1d_vars_{}_{}_{}.nc".format(domain, start_ts, end_ts)
+        print("outfile is set to: {}".format(outfile))
 
     outnc = netCDF4.Dataset(outfile, "w")
 
+    print("Creating dimensions")
     dimensions = merge_dimensions(allncids)
     for dname, dsize in dimensions.items():
         outnc.createDimension(dname, dsize)
@@ -370,6 +373,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
     varlist = merge_variable_names(allncids)
     attrs = ncattrs(allncids)
 
+    print("Creating variables")
     for vname, vsig in varlist.items():
         obj = outnc.createVariable(*vsig)
         obj.setncatts(attrs[vname])
@@ -378,6 +382,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
     profile_ds = merged_group_primary_ds(allncids, key='var_name')
     surface_ds = merged_group_primary_ds(allncids, key='sfcvar_name')
 
+    print("copying metadata")
     for group_key in group_mapping:
         copy_group_data(allncids, outnc, group_key, varlist)
 
@@ -392,7 +397,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
     date_obj[:, :] = date_str
 
     # populating heights data
-    print('populating heights')
+    print('copying heights data')
     heights_obj = outnc.variables['heights']
     req_stations = station_ds.index[:]
     req_profile = profile_ds.index[:]
@@ -419,12 +424,12 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
             profile_index, nc_profile_index = get_indices(
                 profile_ds, nc_profile_ds)
 
-        print('station_index', station_index)
-        print('nc_station_index', nc_station_index)
-        print('req_stations', req_stations)
-        print('profile_index', profile_index)
-        print('nc_profile_index', nc_profile_index)
-        print('req_profiles', req_profile)
+        # print('station_index', station_index)
+        # print('nc_station_index', nc_station_index)
+        # print('req_stations', req_stations)
+        # print('profile_index', profile_index)
+        # print('nc_profile_index', nc_profile_index)
+        # print('req_profiles', req_profile)
 
         if empty(station_index):
             continue
@@ -450,6 +455,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
             break
 
     # populating profile data
+    print("copying profile data")
     profile_obj = outnc.variables['values']
     seen_dates = pd.Index([])
     for nc in ncids:
@@ -503,6 +509,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
         #             profile_obj[tindex_m, :, pind_m, sind_m] = data[tindex, :, pind, sind]
 
     # populating surface data
+    print("copying surface data")
     surface_obj = outnc.variables['sfcvalues']
     seen_dates = pd.Index([])
     for nc in ncids:
@@ -549,6 +556,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None,
         #         # data = isurface_obj[nc_date_index, surf_ind, nc_station_index]
         #         surface_obj[tindex_m, surf_ind_m, station_index] = data[tindex, surf_ind, nc_station_index]
 
+    print("updating global attributes")
     global_attrs = OrderedDict()
     for nc in ncids:
         global_attrs.update(nc.__dict__)
@@ -626,7 +634,7 @@ a name based on the time-steps in the files"""
         click.echo("domain: {}".format(domain))
         click.echo("outfile: {}".format(outfile))
         click.echo("files: {}".format(files))
-        
+
         merge_datasets(files, reference_file, domain, outfile, fullday_timesteps)
     
     cli()
