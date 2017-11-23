@@ -182,7 +182,7 @@ def ncattrs(ncids):
     if 'values' in attrs:
         attrs['values'].update(fill_value)
     if 'sfcvalues' in attrs:
-        attrs['values'].update(fill_value)
+        attrs['sfcvalues'].update(fill_value)
     return attrs
 
 
