@@ -1,5 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-"Meteogram merge datasets"
+"Merge meteogram files"
+
 
 import re
 import glob
@@ -10,13 +13,6 @@ from collections import OrderedDict, defaultdict, namedtuple
 import netCDF4
 import numpy as np
 import pandas as pd
-
-fname = ("/work/bm0834/k203095/OUTPUT/20130425-default/DATA/"
-         "1d_vars_DOM01_20130425T000000Z_20130426T000000Z.nc")
-files = sorted(glob.glob(
-    "/work/bm0834/k203095/OUTPUT/20130425-default/EXTRAS/"
-    "1d_vars_DOM03_*0.nc"
-))
 
 
 var_signature = namedtuple('var_signature', 'name dtype dimensions')
@@ -227,20 +223,23 @@ def dates_as_array_of_strings(dates, ncids):
     return dates_str
 
 
-def merge_parse_date(ncids):
+def merge_parse_date(ncids, fullday_timesteps=True):
+    """
+    This does not literally merge the dates from files as is.
+    It looks at the total span of the combined dates and produces
+    a time series with a uniform frequency. If the datasets have
+    varying frequency, it opts for maximum occuring frequency.
+    """
     dates = [parse_date(nc) for nc in ncids]
-    # freq = max([d.to_series().diff().dropna().value_counts().argmax()
-    #             for d in dates])
     freq = max([d.index.to_series().diff().dropna().value_counts().argmax()
                 for d in dates])
-    # dates_min = min([d.min() for d in dates])
-    # dates_max = max([d.max() for d in dates])
     dates_min = min([d.index.min() for d in dates])
     dates_max = max([d.index.max() for d in dates])
-    if dates_min.time():
-        dates_min = pd.Timestamp(dates_min.date())
-    if dates_max.time():
-        dates_max = dates_max.date() + pd.Timedelta('1 day')
+    if fullday_timesteps:
+        if dates_min.time():
+            dates_min = pd.Timestamp(dates_min.date())
+        if dates_max.time():
+            dates_max = dates_max.date() + pd.Timedelta('1 day')
     dates = pd.date_range(dates_min, dates_max, freq=freq)
     return pd.Series(np.arange(len(dates)), index=dates, name='date')
 
@@ -341,7 +340,8 @@ def copy_group_data(ncids, outnc, group_key, varlist):
     return
 
 
-def merge_datasets(files, reference_file=None, domain=None, outfile=None):
+def merge_datasets(files, reference_file=None, domain=None, outfile=None,
+                   fullday_timesteps=True):
     if domain is None:
         domain = domain_in_filename(files)
     if domain is None:
@@ -352,7 +352,7 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None):
         refnc = netCDF4.Dataset(reference_file)
         allncids = [refnc] + ncids
 
-    dates_ds = merge_parse_date(ncids)
+    dates_ds = merge_parse_date(ncids, fullday_timesteps=fullday_timesteps)
     time_step = create_time_step(len(dates_ds))
     time_data = create_time(dates_ds.index)
 
@@ -543,7 +543,6 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None):
                     data = isurface_obj[nc_date_s, nc_ss, nc_sta]
                     surface_obj[date_s, ss, sta] = data
 
-        
         # data = isurface_obj[:]
         # for (tindex, tindex_m) in zip(nc_date_index, merged_date_index):
         #     for surf_ind, surf_ind_m in zip(nc_surface_index, surface_index):
@@ -566,22 +565,68 @@ def merge_datasets(files, reference_file=None, domain=None, outfile=None):
     return
 
 
-def test(**kwargs):
-    merge_datasets(files, **kwargs)
-    return
-
-def test2(**kwargs):
-    files = sorted(glob.glob("/work/bm0834/k203095/icon-lem-alpha/icon-lem/experiments/hdcp2_final_17/DATA/METEOGRAM_patch003_*"))
-    merge_datasets(files, **kwargs)
-    return
-
-def test3():
-    files = sorted(glob.glob("/work/bm0834/k203095/OUTPUT/20130420-default-redone_v1/DATA/1d_vars_DOM03*.nc"))
-    merge_datasets(files)
-    return
-
 if __name__ == '__main__':
-    # test(outfile='test10.nc')
-    # test()
-    # test2(domain='DOM03')
-    test3()
+    import click
+
+    help_timesteps = """
+"fullday-timesteps" flag ensures that all timestamps exists for the complete
+day by filling out any missing timesteps. The other flag restricts this
+extent to the ones found the files. In either of the cases, any missing
+timesteps in between the files are filled to have a continuous time series.
+(default: is to have fullday timesteps).
+""".strip().replace('\n', ' ')
+
+    help_outfile = """The name of the output file. If not provided, it creates
+a name based on the time-steps in the files"""
+
+    help_domain = """if not provided, tries to infer domain name the files
+"""
+
+    @click.command()
+    @click.option('--fullday-timesteps/--no-fullday-timesteps',
+                  default=True,
+                  help=help_timesteps)
+    @click.option('--reference-file', type=click.Path(),
+                  help="reference file for meta-data")
+    @click.option('--domain', '-d', help=help_domain)
+    @click.option('--outfile', '-o', type=click.Path(), help=help_outfile)
+    @click.argument('files', nargs=-1, type=click.Path())
+    def cli(fullday_timesteps, reference_file, domain, outfile, files):
+        """
+        Merge mutiple meteogram files into a single file.
+
+        The script is designed to handle missing data like stations, profile
+        variables (a.k.a volume variables), surface variables and time. It
+        means, the files involved in the merge process may vary in the
+        number of stations and/or variables.
+
+        With respect to processing time dimension, any duplicated timesteps are
+        automatically droped and any missing timesteps are filled with a default
+        fill value. This is done to achive a continuous time series for the entire
+        dataset. Moreover, "fullday-timesteps" flag ensures that all timesteps
+        from begining of a day untill the end of the day exists in the outfile.
+
+        In few meteogram files, a bug (typo) in the timestamp for the last
+        timestep was discovered. This scipt also accounts to fix that bug.
+
+        To avoid inconsistencies in meteogram files (across simulations), provide
+        a well known good meteogram which has complete set of station, variables
+        (profile and surface) etc., as a "reference file". This file is then used
+        for copying any missing meta-data.
+
+        FILES: files to merge
+        
+        \b
+        EXAMPLE
+        -------
+        python merge.py /work/bm0834/k203095/OUTPUT/20130420-default-redone_v1/DATA/1d_vars_DOM01_*.nc
+        """
+        click.echo("fullday-timesteps: {}".format(fullday_timesteps))
+        click.echo("reference_file: {}".format(reference_file))
+        click.echo("domain: {}".format(domain))
+        click.echo("outfile: {}".format(outfile))
+        click.echo("files: {}".format(files))
+        
+        merge_datasets(files, reference_file, domain, outfile, fullday_timesteps)
+    
+    cli()
