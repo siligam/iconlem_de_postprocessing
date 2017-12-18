@@ -63,6 +63,75 @@ class geoboundingbox(_geoboundingbox):
     def tics(self):
         return (self.ul, self.ur, self.lr, self.ll)
 
+    corners = tics
+
+    @property
+    def width(self):
+        return self.lr.distance_to(self.ll)
+
+    @property
+    def height(self):
+        return self.ul.distance_to(self.ll)
+
+    @property
+    def area(self):
+        return self.width * self.height
+    
+    @property
+    def center(self):
+        return loc(
+            (self.ll.lat + self.ur.lat)/2,
+            (self.ll.lon + self.lr.lon)/2)
+
+    @property
+    def left(self):
+        return loc(
+            (self.ll.lat + self.ul.lat)/2,
+            (self.ll.lon + self.ul.lon)/2,
+            )
+
+    @property
+    def top(self):
+        return loc(
+            (self.ul.lat + self.ur.lat)/2,
+            (self.ul.lon + self.ur.lon)/2,
+            )
+
+    @property
+    def right(self):
+        return loc(
+            (self.ur.lat + self.lr.lat)/2,
+            (self.ur.lon + self.lr.lon)/2,
+        )
+
+    @property
+    def bottom(self):
+        return loc(
+            (self.lr.lat + self.ll.lat)/2,
+            (self.lr.lon + self.ll.lon)/2,
+        )
+
+    @property
+    def edges(self):
+        return (self.left, self.top, self.right, self.bottom)
+
+    def __contains__(self, point):
+        return (
+            self.ll.lat <= point.lat <= self.ul.lat and
+            self.ll.lon <= point.lon <= self.lr.lon)
+
+    def enlarge(self, buf_size):
+        return geoboundingbox(
+            self.ll.bounding_box(buf_size).ll,
+            self.ur.bounding_box(buf_size).ur,
+        )
+
+    def shrink(self, buf_size):
+        return geoboundingbox(
+            self.ll.bounding_box(buf_size).ur,
+            self.ur.bounding_box(buf_size).ll,
+        )
+
 
 _loc = collections.namedtuple('loc', 'lat lon')
 
